@@ -3,6 +3,7 @@ mod animation_manager;
 mod app;
 mod app_state;
 mod cache;
+mod cli;
 mod config;
 mod error;
 mod geolocation;
@@ -11,7 +12,8 @@ mod scene;
 mod weather;
 
 use clap::{CommandFactory, Parser};
-use clap_complete::{Shell, generate};
+use clap_complete::generate;
+use cli::{Cli, SimulateError};
 use config::Config;
 use crossterm::{
     cursor, execute,
@@ -21,77 +23,10 @@ use crossterm::{
 use render::TerminalRenderer;
 use std::{io, panic};
 
-const LONG_VERSION: &str = concat!(
-    env!("CARGO_PKG_VERSION"),
-    "\n\nWeather data provided by Open-Meteo.com (https://open-meteo.com/)\n",
-    "Data licensed under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)\n\n",
-    "Geocoding powered by Nominatim/OpenStreetMap (https://nominatim.openstreetmap.org/)\n",
-    "Data \u{00a9} OpenStreetMap contributors, ODbL (https://www.openstreetmap.org/copyright)"
-);
-
 fn info(silent: bool, msg: &str) {
     if !silent {
         println!("{}", msg);
     }
-}
-
-const ABOUT: &str = concat!(
-    "Terminal-based ASCII weather application\n\n",
-    "Weather data provided by Open-Meteo.com (https://open-meteo.com/)\n",
-    "Data licensed under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)\n\n",
-    "Geocoding powered by Nominatim/OpenStreetMap (https://nominatim.openstreetmap.org/)\n",
-    "Data \u{00a9} OpenStreetMap contributors, ODbL (https://www.openstreetmap.org/copyright)"
-);
-
-#[derive(Parser)]
-#[command(version, long_version = LONG_VERSION, about = ABOUT, long_about = None)]
-struct Cli {
-    #[arg(
-        short,
-        long,
-        value_name = "CONDITION",
-        help = "Simulate weather condition (clear, rain, drizzle, snow, etc.)"
-    )]
-    simulate: Option<String>,
-
-    #[arg(
-        short,
-        long,
-        help = "Simulate night time (for testing moon, stars, fireflies)"
-    )]
-    night: bool,
-
-    #[arg(short, long, help = "Enable falling autumn leaves")]
-    leaves: bool,
-
-    #[arg(long, help = "Auto-detect location via IP (uses ipinfo.io)")]
-    auto_location: bool,
-
-    #[arg(long, help = "Hide location coordinates in UI")]
-    hide_location: bool,
-
-    #[arg(long, help = "Hide HUD (status line)")]
-    hide_hud: bool,
-
-    #[arg(
-        long,
-        conflicts_with = "metric",
-        help = "Use imperial units (°F, mph, inch)"
-    )]
-    imperial: bool,
-
-    #[arg(
-        long,
-        conflicts_with = "imperial",
-        help = "Use metric units (°C, km/h, mm)"
-    )]
-    metric: bool,
-
-    #[arg(long, help = "Run silently (suppress non-error output)")]
-    silent: bool,
-
-    #[arg(long, value_name = "SHELL", value_enum)]
-    pub completions: Option<Shell>,
 }
 
 #[tokio::main]
@@ -106,44 +41,20 @@ async fn main() -> io::Result<()> {
     let cli = match Cli::try_parse() {
         Ok(cli) => cli,
         Err(err) => {
-            let err_str = err.to_string();
-            if err_str.contains("--simulate") && err_str.contains("value is required") {
-                eprintln!("{}", err);
-                eprintln!();
-                eprintln!("Available weather conditions:");
-                eprintln!();
-                eprintln!("  Clear Skies:");
-                eprintln!("    clear              - Clear sunny sky");
-                eprintln!("    partly-cloudy      - Partial cloud coverage");
-                eprintln!("    cloudy             - Cloudy sky");
-                eprintln!("    overcast           - Overcast sky");
-                eprintln!();
-                eprintln!("  Precipitation:");
-                eprintln!("    fog                - Foggy conditions");
-                eprintln!("    drizzle            - Light drizzle");
-                eprintln!("    rain               - Rain");
-                eprintln!("    freezing-rain      - Freezing rain");
-                eprintln!("    rain-showers       - Rain showers");
-                eprintln!();
-                eprintln!("  Snow:");
-                eprintln!("    snow               - Snow");
-                eprintln!("    snow-grains        - Snow grains");
-                eprintln!("    snow-showers       - Snow showers");
-                eprintln!();
-                eprintln!("  Storms:");
-                eprintln!("    thunderstorm       - Thunderstorm");
-                eprintln!("    thunderstorm-hail  - Thunderstorm with hail");
-                eprintln!();
-                eprintln!("Examples:");
-                eprintln!("  weathr --simulate rain");
-                eprintln!("  weathr --simulate snow --night");
-                eprintln!("  weathr -s thunderstorm -n");
-                std::process::exit(1);
-            } else {
-                err.exit();
-            }
+            let err = cli::extract_simulate_missing_value(err);
+            eprintln!("{}", err);
+            eprintln!();
+            cli::print_simulate_help();
+            std::process::exit(1);
         }
     };
+
+    if let Err(SimulateError::UnknownCondition(condition)) = cli::validate_simulate(&cli) {
+        eprintln!("error: unknown weather condition '{}'", condition);
+        eprintln!();
+        cli::print_simulate_help();
+        std::process::exit(1);
+    }
 
     if let Some(shell) = cli.completions {
         let mut cmd = Cli::command();
