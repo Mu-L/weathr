@@ -71,6 +71,7 @@ impl AnimationManager {
     pub fn update_wind(&mut self, speed_kmh: f32, direction_deg: f32) {
         self.raindrop_system.set_wind(speed_kmh, direction_deg);
         self.snow_system.set_wind(speed_kmh, direction_deg);
+        self.cloud_system.set_wind(speed_kmh, direction_deg);
     }
 
     pub fn update_fog_intensity(&mut self, intensity: FogIntensity) {

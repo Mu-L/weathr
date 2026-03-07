@@ -10,6 +10,7 @@ struct Cloud {
     x: f32,
     y: f32,
     speed: f32,
+    wind_x: f32,
     shape: Vec<String>,
     color: Color,
 }
@@ -18,6 +19,7 @@ pub struct CloudSystem {
     clouds: Vec<Cloud>,
     terminal_width: u16,
     terminal_height: u16,
+    base_wind_x: f32,
 }
 
 impl CloudSystem {
@@ -30,6 +32,15 @@ impl CloudSystem {
 
         for cloud in &mut self.clouds {
             cloud.color = color;
+        }
+    }
+
+    pub fn set_wind(&mut self, speed_kmh: f32, direction_deg: f32) {
+        let direction_rad = direction_deg.to_radians();
+        self.base_wind_x = (speed_kmh / 50.0) * (-direction_rad.sin());
+        let mut rng = rand::rng();
+        for cloud in &mut self.clouds {
+            cloud.wind_x = self.base_wind_x * (0.8 + rng.random::<f32>() * 0.4);
         }
     }
 }
@@ -49,6 +60,7 @@ impl CloudSystem {
                 terminal_height,
                 true,
                 Color::White,
+                0.15,
                 &mut rng,
             ));
         }
@@ -57,6 +69,7 @@ impl CloudSystem {
             clouds,
             terminal_width,
             terminal_height,
+            base_wind_x: 0.15,
         }
     }
 
@@ -65,6 +78,7 @@ impl CloudSystem {
         height: u16,
         random_x: bool,
         color: Color,
+        base_wind_x: f32,
         rng: &mut impl Rng,
     ) -> Cloud {
         let shapes = CLOUD_SHAPES.get_or_init(Self::create_cloud_shapes);
@@ -78,15 +92,17 @@ impl CloudSystem {
         let x = if random_x {
             (rng.random::<u16>() % width) as f32
         } else {
-            -(shape[0].len() as f32)
+            0.0
         };
 
-        let speed = 0.05 + (rng.random::<f32>() * 0.1);
+        let speed = 0.02 + (rng.random::<f32>() * 0.03);
+        let wind_x = base_wind_x * (0.8 + rng.random::<f32>() * 0.4);
 
         Cloud {
             x,
             y,
             speed,
+            wind_x,
             shape,
             color,
         }
@@ -133,7 +149,7 @@ impl CloudSystem {
         self.terminal_height = terminal_height;
 
         for cloud in &mut self.clouds {
-            cloud.x += cloud.speed;
+            cloud.x += cloud.speed + cloud.wind_x;
         }
 
         self.clouds.retain(|c| c.x < terminal_width as f32);
@@ -152,6 +168,7 @@ impl CloudSystem {
                 terminal_height,
                 false,
                 cloud_color,
+                self.base_wind_x,
                 rng,
             ));
         }
@@ -163,11 +180,18 @@ impl CloudSystem {
                 let y = cloud.y as i16 + i as i16;
                 let x = cloud.x as i16;
 
-                if y >= 0 && y < self.terminal_height as i16 {
+                if y < 0 || y >= self.terminal_height as i16 {
+                    continue;
+                }
+
+                let clip = ((-x).max(0)) as usize;
+                let visible = &line[clip.min(line.len())..];
+
+                if !visible.is_empty() {
                     renderer.render_line_colored(
-                        std::cmp::max(0, x) as u16,
+                        x.max(0) as u16,
                         y as u16,
-                        line,
+                        visible,
                         cloud.color,
                     )?;
                 }
