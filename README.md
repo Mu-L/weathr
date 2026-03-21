@@ -94,16 +94,15 @@ Mount your config if you want to use your existing settings:
 
 ```bash
 docker run --rm -it \
-  -v "$HOME/.config/weathr:/root/.config/weathr:ro" \
+  -v "$HOME/.config/weathr:/.config/weathr:ro" \
   weathr
 ```
 
-````
 ### Homebrew (macOS)
 
 ```bash
 brew install Veirt/veirt/weathr
-````
+```
 
 ### MacPorts (macOS)
 
