@@ -262,8 +262,10 @@ mod tests {
             timestamp: "2024-01-01T21:00:00Z".to_string(),
             attribution: String::new(),
         });
-        let mut conditions = WeatherConditions::default();
-        conditions.sun = sun;
+        let conditions = WeatherConditions {
+            sun,
+            ..WeatherConditions::default()
+        };
 
         let ctx = FrameContext {
             size: TerminalSize {
@@ -302,8 +304,10 @@ mod tests {
             timestamp: "n/a".to_string(),
             attribution: String::new(),
         });
-        let mut conditions = WeatherConditions::default();
-        conditions.sun = sun;
+        let conditions = WeatherConditions {
+            sun,
+            ..WeatherConditions::default()
+        };
 
         let ctx = FrameContext {
             size: TerminalSize {

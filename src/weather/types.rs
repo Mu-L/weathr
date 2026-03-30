@@ -79,6 +79,7 @@ impl WeatherCondition {
         }
     }
 
+    #[allow(dead_code)]
     pub fn description(&self) -> &'static str {
         match self {
             Self::Clear => "Clear sunny sky",
@@ -98,6 +99,7 @@ impl WeatherCondition {
         }
     }
 
+    #[allow(dead_code)]
     pub fn group(&self) -> &'static str {
         match self {
             Self::Clear | Self::PartlyCloudy | Self::Cloudy | Self::Overcast => "Clear Skies",
